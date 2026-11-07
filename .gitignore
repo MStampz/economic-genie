@@ -1,0 +1,13 @@
+# Bank data and secrets: never commit
+data/
+*.csv
+*.db
+*.sqlite
+.env
+.env.*
+
+# Tooling
+__pycache__/
+node_modules/
+.venv/
+.DS_Store
