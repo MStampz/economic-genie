@@ -1,0 +1,20 @@
+{
+  "rules": [
+    { "pattern": "LUCENT GLOBE|TRANSLAYTE|FUTURE RECYCLING|YOUQIAN|FNIGHTS|MAMAS DAILY|WHOLLY SHRINK", "is_regex": true, "category": "Other shopping" },
+    { "pattern": "SHOE REPAI", "category": "Services" },
+    { "pattern": "BERTOVIC", "category": "Medical" },
+    { "pattern": "DOG HUB", "category": "Pets" },
+    { "pattern": "DC SL PTY", "category": "Attractions & events" },
+    { "pattern": "LINKT", "category": "Parking & tolls" },
+    { "pattern": "VICROADS", "category": "Vehicle expenses" },
+    { "pattern": "APPLE\\.COM/BILL|ANTHROPIC|LinkedIn", "is_regex": true, "category": "Subscriptions" },
+    { "pattern": "\\brent\\b", "is_regex": true, "category": "Rent" },
+    { "pattern": "on ?point", "is_regex": true, "category": "Crosser" },
+    { "pattern": "MX STORE", "category": "Crosser" },
+    { "pattern": "BAILEY", "category": "Personal care" },
+    { "pattern": "TUKK CO", "category": "Cafe & coffee" },
+    { "pattern": "HAGEN'?S ORGANIC", "is_regex": true, "category": "Groceries" },
+    { "pattern": "DUKA A/S", "category": "Homeware" },
+    { "pattern": "(^|\\s)COM\\*", "is_regex": true, "category": "Education" }
+  ]
+}

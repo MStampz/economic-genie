@@ -1,0 +1,40 @@
+# Economic Genie on your own computer: database, API and web app.
+# Start: docker compose up -d --build   then open http://localhost:3000
+name: economic-genie
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: genie
+      POSTGRES_DB: genie
+      POSTGRES_PASSWORD: ${GENIE_DB_PASSWORD:-genie-local-only}
+    volumes:
+      - genie-data:/var/lib/postgresql/data   # your data lives here and survives restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U genie -d genie"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GENIE_DATABASE_URL: postgresql+psycopg://genie:${GENIE_DB_PASSWORD:-genie-local-only}@db:5432/genie
+      GENIE_COOKIE_SECURE: "false"   # set to true once the app is served over https
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      # Only this Mac can open the app. To let phones on your home Wi-Fi in, set GENIE_BIND=0.0.0.0 in .env.
+      - "${GENIE_BIND:-127.0.0.1}:${GENIE_PORT:-3000}:80"
+
+volumes:
+  genie-data:

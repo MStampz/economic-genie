@@ -1,0 +1,9 @@
+Date,Amount,Account Number,,Transaction Type,Transaction Details,Balance,Category,Merchant Name,Processed On
+06 Nov 26,-4.80,Card ending 1111,,PURCHASE AUTHORISATION,CORNER CAFE MELBOURNE AUS,-1771.47,Cafe & coffee,Corner Cafe,
+05 Nov 26,-62.10,Card ending 1111,,CREDIT CARD PURCHASE,WOOLWORTHS 1234 BRIGHTON AUS,-1766.67,Groceries,Woolworths,06 Nov 26
+05 Nov 26,-4.80,Card ending 1111,,CREDIT CARD PURCHASE,CORNER CAFE MELBOURNE AUS,-1704.57,Cafe & coffee,Corner Cafe,06 Nov 26
+05 Nov 26,-4.80,Card ending 1111,,CREDIT CARD PURCHASE,CORNER CAFE MELBOURNE AUS,-1699.77,Cafe & coffee,Corner Cafe,06 Nov 26
+04 Nov 26,500.00,Card ending 1111,,CREDIT CARD PAYMENT,PAYMENT RECEIVED THANK YOU,-1694.97,Internal transfers,,04 Nov 26
+03 Nov 26,-89.00,Card ending 2222,,CREDIT CARD PURCHASE,AMAZON AU SYDNEY SOUTH AUS,-310.00,Other shopping,Amazon,04 Nov 26
+02 Nov 26,-45.00,Card ending 2222,,CREDIT CARD PURCHASE,MX STORE MOORABBIN AUS,-221.00,Vehicle expenses,MX Store,03 Nov 26
+02 Nov 26,12.50,Card ending 2222,,CREDIT CARD REFUND,KMART CHELTENHAM AUS,-176.00,Other shopping,Kmart,03 Nov 26
