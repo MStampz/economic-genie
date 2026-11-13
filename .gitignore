@@ -11,3 +11,13 @@ __pycache__/
 node_modules/
 .venv/
 .DS_Store
+dist/
+*.egg-info/
+backups/
+.pytest_cache/
+.ruff_cache/
+
+# Synthetic test files and the settings template are safe to commit.
+!backend/tests/fixtures/*.csv
+!.env.example
+*.tsbuildinfo
