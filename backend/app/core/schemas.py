@@ -178,7 +178,10 @@ class ImportResult(BaseModel):
     rows_duplicate: int
     rows_pending_replaced: int
     accounts_created: list[str]
+    accounts: list[str]
     transfers_paired: int
+    format: str
+    filename: str | None
 
 
 class ApplyRulesResult(BaseModel):

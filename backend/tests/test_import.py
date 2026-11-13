@@ -83,7 +83,7 @@ def test_bad_file_gives_friendly_error(client):
     gid = _setup(client)
     r = client.post(f"/api/groups/{gid}/imports", files={"file": ("x.csv", b"hello,world\n1,2\n", "text/csv")})
     assert r.status_code == 422
-    assert "NAB" in r.json()["detail"]
+    assert "Match its columns" in r.json()["detail"]
 
 
 def test_rules_and_manual_category(client):

@@ -24,10 +24,19 @@ More detail, including using it from your phone at home and backups: [docs/run-o
 
 ## Import transactions
 
-In NAB Internet Banking, open an account, choose **Export**, pick **CSV** and a date range, then drop the file on
-the **Import** tab. Import as often as you like: overlapping files are fine, rows you already have are skipped, and
-pending card authorisations are replaced when they settle. Credit card payments from your transaction account are
-matched to the card and not counted as spending.
+Export a CSV file from your bank's internet banking and drop it on the **Import** tab.
+
+- **Known formats** (NAB today) are recognised from the file's columns and imported straight away.
+- **Any other bank's CSV:** the first time, you match its columns (date, amount or money out/in, description,
+  account) with a live preview. The layout is saved for your group, so the next file from that bank imports
+  straight away. Files with or without a header row, with `,` `;` or tab separators, and amounts like `(12.00)`,
+  `12.00 DR` or `$1,234.56` all work.
+- Import as often as you like: overlapping files are fine, rows you already have are skipped, and pending card
+  authorisations are replaced when they settle. Card payments from your transaction account are matched to the card
+  and not counted as spending.
+
+Every source becomes the same common row (`ParsedRow`) before it is stored, so open banking (Basiq, Fiskil) will be
+one more connector in `backend/app/ingestion/connectors/` feeding the same pipeline.
 
 To load the rules from the prototype, open **Rules → Import rules (JSON)** and pick
 [`examples/prototype-rules.json`](examples/prototype-rules.json), then tap **Apply rules**.

@@ -55,7 +55,7 @@ export default function Transactions({ gid }: { gid: string }) {
         <button className={hideTransfers ? "chip on" : "chip"} onClick={() => setHideTransfers(!hideTransfers)}>Hide own transfers</button>
       </div>
       {error && <p className="error">{error}</p>}
-      {total === 0 && !error && <p className="empty">No transactions yet. Import a NAB CSV file to get started.</p>}
+      {total === 0 && !error && <p className="empty">No transactions yet. Import a CSV file from your bank to get started.</p>}
       {[...byDay.entries()].map(([day, rows]) => (
         <div key={day} className="day">
           <h3>{new Date(day + "T00:00").toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</h3>

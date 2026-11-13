@@ -41,6 +41,10 @@ def _money(value: str, field: str, line: int) -> Decimal | None:
 class NabCsvConnector:
     source = "nab_csv"
     institution = "NAB"
+    label = "NAB Internet Banking export"
+
+    def matches(self, header: list[str]) -> bool:
+        return all(c in header for c in REQUIRED) and "Account Number" in header
 
     def parse(self, data: bytes) -> list[ParsedRow]:
         try:
