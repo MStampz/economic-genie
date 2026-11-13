@@ -2,6 +2,9 @@
 # Double-click in Finder to start Economic Genie. Docker Desktop must be installed.
 cd "$(dirname "$0")" || exit 1
 
+# Docker Desktop's command-line tools are not always on the PATH; use the copy inside the app.
+command -v docker >/dev/null 2>&1 || export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"
+
 if ! docker info >/dev/null 2>&1; then
   echo "Starting Docker Desktop..."
   open -a Docker
