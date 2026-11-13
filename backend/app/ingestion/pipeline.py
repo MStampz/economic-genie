@@ -29,6 +29,7 @@ _TRANSFER_HINTS = ("TRANSFER", "PAYMENT")
 class ImportOutcome:
     batch: ImportBatch
     accounts_created: list[str] = field(default_factory=list)
+    accounts_in_file: list[str] = field(default_factory=list)
     transfers_paired: int = 0
 
 
@@ -101,6 +102,7 @@ def import_rows(
     outcome = ImportOutcome(batch=batch)
     # Flushes the batch too, so batch.id is set from here on.
     accounts = _accounts(db, group_id, connector, {r.account_ref for r in rows}, outcome)
+    outcome.accounts_in_file = sorted(a.name for a in accounts.values())
 
     # 2. Pending rows: the new file is the current truth from its earliest date onwards.
     earliest: dict[str, object] = {}

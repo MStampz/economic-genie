@@ -295,3 +295,21 @@ class AuditEvent(Base):
     user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
     action: Mapped[str] = mapped_column(String(64))
     detail: Mapped[dict | None] = mapped_column(JSON)
+
+
+class ImportProfile(Base):
+    """A CSV layout a group has taught the app once: which column is the date, the amount and so on.
+
+    Found again by the file's header, so the next file from the same bank imports without questions.
+    """
+
+    __tablename__ = "import_profiles"
+    __table_args__ = (UniqueConstraint("group_id", "header_signature", name="uq_import_profile_header"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=new_id)
+    group_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    header_signature: Mapped[str] = mapped_column(String(64))
+    mapping: Mapped[dict] = mapped_column(JSON)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

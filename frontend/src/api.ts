@@ -10,7 +10,19 @@ export type Transaction = {
   bank_type: string | null; is_pending: boolean; category_id: string | null; category_source: string; is_internal_transfer: boolean;
 };
 export type ImportResult = {
-  rows_total: number; rows_new: number; rows_duplicate: number; rows_pending_replaced: number; accounts_created: string[]; transfers_paired: number;
+  rows_total: number; rows_new: number; rows_duplicate: number; rows_pending_replaced: number; accounts_created: string[];
+  accounts: string[]; transfers_paired: number; format: string; filename: string | null;
+};
+export type CsvMapping = {
+  has_header: boolean; date: string; date_format: "auto" | "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD";
+  amount: string | null; debit: string | null; credit: string | null; flip_sign: boolean; description: string[];
+  merchant: string | null; category: string | null; balance: string | null;
+  account_column: string | null; account_name: string | null; account_kind: "transaction" | "credit_card"; institution: string;
+};
+export type ImportPreview = {
+  status: "recognised" | "saved" | "needs_mapping" | "mapping"; format: string | null; columns: string[]; has_header: boolean;
+  sample: string[][]; suggested: Partial<CsvMapping>; parsed: { date: string; amount: string; description: string; account: string }[];
+  error: string | null;
 };
 export type AuditEvent = { at: string; action: string; user_id: string | null; detail: Record<string, unknown> | null };
 
@@ -36,6 +48,14 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 const g = (id: string) => `/groups/${id}`;
+
+function form(file: File, mapping?: CsvMapping, saveAs?: string) {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (mapping) fd.append("mapping", JSON.stringify(mapping));
+  if (saveAs) fd.append("save_as", saveAs);
+  return fd;
+}
 
 export const api = {
   me: () => call<Me>("GET", "/auth/me"),
@@ -68,12 +88,15 @@ export const api = {
   },
   setCategory: (gid: string, id: string, category_id: string | null) =>
     call<Transaction>("PATCH", `${g(gid)}/transactions/${id}`, { category_id }),
-  importFile: (gid: string, file: File) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("source", "nab_csv");
-    return call<ImportResult>("POST", `${g(gid)}/imports`, fd);
+  previewFile: (gid: string, file: File, mapping?: CsvMapping, hasHeader?: boolean) => {
+    const fd = form(file, mapping);
+    if (hasHeader !== undefined) fd.append("has_header", String(hasHeader));
+    return call<ImportPreview>("POST", `${g(gid)}/imports/preview`, fd);
   },
+  importFile: (gid: string, file: File, mapping?: CsvMapping, saveAs?: string) =>
+    call<ImportResult>("POST", `${g(gid)}/imports`, form(file, mapping, saveAs)),
+  importProfiles: (gid: string) => call<{ id: string; name: string; institution: string }[]>("GET", `${g(gid)}/import-profiles`),
+  deleteImportProfile: (gid: string, id: string) => call<void>("DELETE", `${g(gid)}/import-profiles/${id}`),
 };
 
 export const money = (v: string | number, currency = "AUD") =>
