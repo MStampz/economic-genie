@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Category, type Rule } from "../api";
 
-export default function Rules({ gid }: { gid: string }) {
+export default function Rules({ gid, embedded }: { gid: string; embedded?: boolean }) {
   const [rules, setRules] = useState<Rule[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [pattern, setPattern] = useState("");
@@ -33,7 +33,7 @@ export default function Rules({ gid }: { gid: string }) {
   const catName = new Map(cats.map((c) => [c.id, c.name]));
   return (
     <section>
-      <h1>Category rules</h1>
+      {!embedded && <h1>Category rules</h1>}
       <p className="muted">A rule puts every transaction whose merchant or description contains the text into a category.
         Categories you pick by hand are never changed by rules.</p>
       <form className="card form" onSubmit={(e) => { e.preventDefault(); act(async () => { await api.createRule(gid, pattern, categoryId); setPattern(""); }); }}>

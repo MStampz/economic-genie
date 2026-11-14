@@ -209,6 +209,7 @@ def list_transactions(
     db: Session = Depends(get_db),
     account_id: uuid.UUID | None = None,
     category_id: uuid.UUID | None = None,
+    category_ids: list[uuid.UUID] | None = Query(default=None, max_length=100),
     uncategorised: bool = False,
     include_transfers: bool = True,
     date_from: date | None = None,
@@ -222,6 +223,8 @@ def list_transactions(
         conds.append(Transaction.account_id == account_id)
     if category_id:
         conds.append(Transaction.category_id == category_id)
+    if category_ids:
+        conds.append(Transaction.category_id.in_(category_ids))
     if uncategorised:
         unc = select(Category.id).where(Category.group_id.is_(None), Category.name == "Uncategorised")
         conds.append(or_(Transaction.category_id.is_(None), Transaction.category_id.in_(unc)))

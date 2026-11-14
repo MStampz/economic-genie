@@ -109,7 +109,7 @@ function Done({ result, onView, onAnother }: { result: ImportResult; onView: () 
         {result.accounts_created.length > 0 && <li>New account{result.accounts_created.length > 1 ? "s" : ""}: {result.accounts_created.join(", ")}</li>}
       </ul>
       <div className="row-actions">
-        <button className="primary" onClick={onView}>View transactions</button>
+        <button className="primary" onClick={onView}>See the overview</button>
         <button onClick={onAnother}>Import another file</button>
       </div>
     </div>
