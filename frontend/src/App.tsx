@@ -47,6 +47,25 @@ export default function App() {
   if (!group) return <Onboard me={me} onDone={async (id) => { setGroupId(id); remember("genie.group", id); await refresh(); }} />;
 
   const pick = (t: Tab) => { setTab(t); remember("genie.tab", t); };
+  const tabbar = (
+    <nav className={tab === "overview" ? "tabbar on-eg" : "tabbar"}>
+      {TABS.map((t) => (
+        <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => pick(t.id)}>
+          <span className="tab-icon" aria-hidden>{t.icon}</span>
+          <span>{t.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+  // The Overview is the full-width prototype page with its own header; the other screens keep the app shell.
+  if (tab === "overview") {
+    return (
+      <>
+        <Overview key={group.group_id} gid={group.group_id} groupName={group.group_name} onImport={() => pick("import")} />
+        {tabbar}
+      </>
+    );
+  }
   return (
     <div className="shell">
       <header className="topbar">
@@ -59,7 +78,6 @@ export default function App() {
         ) : <span className="group-name">{group.group_name}</span>}
       </header>
       <main className="content">
-        {tab === "overview" && <Overview gid={group.group_id} onSetBudget={() => pick("budget")} />}
         {tab === "transactions" && <Transactions gid={group.group_id} />}
         {tab === "budget" && <Budget gid={group.group_id} />}
         {tab === "import" && <Import gid={group.group_id} onImported={() => pick("overview")} />}
@@ -69,14 +87,7 @@ export default function App() {
             onSignedOut={async () => { await api.logout(); setMe(null); }} />
         )}
       </main>
-      <nav className="tabbar">
-        {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? "active" : ""} onClick={() => pick(t.id)}>
-            <span className="tab-icon" aria-hidden>{t.icon}</span>
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </nav>
+      {tabbar}
     </div>
   );
 }
