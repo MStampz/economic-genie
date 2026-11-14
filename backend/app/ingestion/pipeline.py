@@ -9,7 +9,7 @@ Steps, in one database transaction:
 
 import hashlib
 import uuid
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
 
 from sqlalchemy import delete, select
@@ -18,11 +18,8 @@ from sqlalchemy.orm import Session
 from app.core import audit
 from app.core.categories import Categoriser
 from app.core.models import Account, ImportBatch, Transaction
+from app.core.transfers import pair_transfers
 from app.ingestion.connectors.base import Connector, ParsedRow
-
-PAIR_WINDOW_DAYS = 3
-# Bank transaction types that can be one leg of a transfer between the group's own accounts.
-_TRANSFER_HINTS = ("TRANSFER", "PAYMENT")
 
 
 @dataclass
@@ -154,6 +151,7 @@ def import_rows(
             category_id=category_id,
             category_source=source,
             is_internal_transfer=is_transfer,
+            source_transfer=is_transfer,
             fingerprint=fp,
             raw=r.raw,
         )
@@ -176,53 +174,4 @@ def import_rows(
     return outcome
 
 
-def _could_be_transfer(t: Transaction) -> bool:
-    bank_type = (t.bank_type or "").upper()
-    return t.is_internal_transfer or any(h in bank_type for h in _TRANSFER_HINTS)
-
-
-def pair_transfers(db: Session, group_id: uuid.UUID, categoriser: Categoriser | None = None) -> int:
-    """Pairs money leaving one of the group's accounts with the same amount arriving in another.
-
-    Only rows that look like a transfer or payment take part, so an unrelated refund that happens
-    to match a purchase is never hidden. Both legs are then treated as internal transfers. A
-    transfer to someone outside the group (rent, a club) finds no partner and stays as spending.
-    """
-    candidates = [
-        t
-        for t in db.scalars(
-            select(Transaction)
-            .where(
-                Transaction.group_id == group_id,
-                Transaction.transfer_pair_id.is_(None),
-                Transaction.is_pending.is_(False),
-            )
-            .order_by(Transaction.posted_date, Transaction.created_at)
-        )
-        if _could_be_transfer(t)
-    ]
-    incoming: dict = defaultdict(list)
-    for t in candidates:
-        if t.amount > 0:
-            incoming[t.amount].append(t)
-    categoriser = categoriser or Categoriser(db, group_id)
-    paired = 0
-    for out in candidates:
-        if out.amount >= 0 or out.transfer_pair_id is not None:
-            continue
-        for inc in incoming.get(-out.amount, []):
-            if (
-                inc.transfer_pair_id is None
-                and inc.account_id != out.account_id
-                and abs((inc.posted_date - out.posted_date).days) <= PAIR_WINDOW_DAYS
-            ):
-                pair_id = uuid.uuid4()
-                for leg in (out, inc):
-                    leg.transfer_pair_id = pair_id
-                    leg.is_internal_transfer = True
-                    if leg.category_source != "user" and categoriser.transfer is not None:
-                        leg.category_id, leg.category_source = categoriser.transfer.id, "bank"
-                paired += 1
-                break
-    db.flush()
-    return paired
+__all__ = ["fingerprint", "import_rows", "pair_transfers"]

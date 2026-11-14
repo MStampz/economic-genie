@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { api, money, type CsvMapping, type ImportPreview, type ImportResult } from "../api";
+import { api, money, type AccountChoice, type CsvMapping, type ImportBatch, type ImportPreview, type ImportResult } from "../api";
 
-type Stage = "pick" | "checking" | "map" | "importing" | "done";
+type Stage = "pick" | "checking" | "confirm" | "map" | "importing" | "done";
 
 const EMPTY: CsvMapping = {
   has_header: true, date: "", date_format: "auto", amount: null, debit: null, credit: null, flip_sign: false,
@@ -18,15 +18,33 @@ export default function Import({ gid, onImported }: { gid: string; onImported: (
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState("");
   const [drag, setDrag] = useState(false);
+  const [history, setHistory] = useState<ImportBatch[]>([]);
+  const [notice, setNotice] = useState("");
+
+  const loadHistory = () => { api.imports(gid).then(setHistory).catch(() => {}); };
+  useEffect(loadHistory, [gid]);
+
+  async function undo(batchId: string, label: string) {
+    if (!confirm(`Remove every transaction that ${label} added? This can't be undone, but you can import the file again.`)) return;
+    setError("");
+    try {
+      const r = await api.undoImport(gid, batchId);
+      setNotice(`Removed ${r.removed} transaction${r.removed === 1 ? "" : "s"}` +
+        (r.accounts_removed.length ? ` and the now empty account${r.accounts_removed.length > 1 ? "s" : ""} ${r.accounts_removed.join(", ")}.` : "."));
+      reset(); loadHistory(); onImported();
+    } catch (e) { setError((e as Error).message); }
+  }
 
   async function choose(f: File | undefined) {
     if (!f) return;
-    setFile(f); setError(""); setResult(null); setStage("checking");
+    setFile(f); setError(""); setNotice(""); setResult(null); setStage("checking");
     try {
       const p = await api.previewFile(gid, f);
       setPreview(p);
       if ((p.status === "recognised" || p.status === "saved") && !p.error) {
         await doImport(f);
+      } else if (p.status === "confirm_account" && p.account_choice && !p.error) {
+        setStage("confirm");
       } else {
         setMapping({ ...EMPTY, ...p.suggested, institution: "", account_name: "" } as CsvMapping);
         setSaveAs("");
@@ -37,15 +55,24 @@ export default function Import({ gid, onImported }: { gid: string; onImported: (
     }
   }
 
-  async function doImport(f: File, m?: CsvMapping) {
+  async function doImport(f: File, m?: CsvMapping, layoutName?: string) {
+    const back: Stage = layoutName ? "confirm" : m ? "map" : "pick";
     setStage("importing"); setError("");
     try {
-      setResult(await api.importFile(gid, f, m, m ? saveAs || `${m.institution} CSV` : undefined));
+      setResult(await api.importFile(gid, f, m, m ? layoutName || saveAs || `${m.institution} CSV` : undefined));
       setStage("done");
+      loadHistory();
     } catch (e) {
       setError((e as Error).message);
-      setStage(m ? "map" : "pick");
+      setStage(back);
     }
+  }
+
+  function remap() {
+    if (!preview) return;
+    setMapping({ ...EMPTY, ...preview.suggested, institution: "", account_name: "" } as CsvMapping);
+    setSaveAs("");
+    setStage("map");
   }
 
   function reset() { setStage("pick"); setFile(null); setPreview(null); setResult(null); setError(""); }
@@ -67,10 +94,29 @@ export default function Import({ gid, onImported }: { gid: string; onImported: (
             <span className="drop-icon">⇪</span>
             <span>{stage === "checking" ? "Reading the file…" : "Choose a CSV file or drop it here"}</span>
           </label>
+          {notice && <p className="hint">{notice}</p>}
+          {history.some((b) => b.remaining > 0) && (
+            <div className="card">
+              <h2>Recent imports</h2>
+              <ul className="list small">
+                {history.filter((b) => b.remaining > 0).slice(0, 10).map((b) => (
+                  <li key={b.id}>
+                    <span>{b.filename ?? "File"} <span className="muted">· {new Date(b.created_at).toLocaleDateString("en-AU")} · {b.remaining} transaction{b.remaining === 1 ? "" : "s"} in {b.accounts.join(", ")}</span></span>
+                    <button className="link danger" onClick={() => undo(b.id, b.filename ?? "this import")}>Undo</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       ) : null}
 
       {stage === "importing" && <div className="card center"><div className="spinner" /> Importing {file?.name}…</div>}
+
+      {stage === "confirm" && preview?.account_choice && file && (
+        <ConfirmAccount preview={preview} choice={preview.account_choice} file={file} onRemap={remap} onCancel={reset}
+          onImport={(m) => doImport(file, m, preview.account_choice!.layout)} />
+      )}
 
       {stage === "map" && preview && file && (
         <Mapper preview={preview} file={file} gid={gid} mapping={mapping} setMapping={setMapping}
@@ -79,12 +125,71 @@ export default function Import({ gid, onImported }: { gid: string; onImported: (
 
       {error && <p className="error">{error}</p>}
 
-      {stage === "done" && result && <Done result={result} onView={onImported} onAnother={reset} />}
+      {stage === "done" && result && <Done result={result} onView={onImported} onAnother={reset}
+        onUndo={() => undo(result.batch_id, result.filename ?? "this import")} />}
     </section>
   );
 }
 
-function Done({ result, onView, onAnother }: { result: ImportResult; onView: () => void; onAnother: () => void }) {
+// A saved layout whose files don't say which account they are from: always ask, so a second account's
+// file never lands in the first account.
+function ConfirmAccount({ preview, choice, file, onRemap, onCancel, onImport }: {
+  preview: ImportPreview; choice: AccountChoice; file: File; onRemap: () => void; onCancel: () => void;
+  onImport: (m: CsvMapping) => void;
+}) {
+  const known = choice.accounts.some((a) => a.ref === choice.suggested_ref);
+  const [ref, setRef] = useState(known ? choice.suggested_ref : "");
+  const [newName, setNewName] = useState("");
+  const [kind, setKind] = useState<CsvMapping["account_kind"]>(choice.mapping.account_kind);
+  const existing = choice.accounts.find((a) => a.ref === ref);
+  const name = existing ? existing.ref : newName.trim();
+  return (
+    <div className="card">
+      <h2>Which account is this file from?</h2>
+      <p className="muted"><b>{file.name}</b> uses your saved layout “{choice.layout}”. The file doesn't say which account it
+        belongs to, so choose one.</p>
+      <ul className="list small">
+        {preview.parsed.slice(0, 4).map((r, i) => (
+          <li key={i}>
+            <span>{r.date} · {r.description}</span>
+            <span className={Number(r.amount) < 0 ? "amount out" : "amount in"}>{money(r.amount)}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="form">
+        <label>Account
+          <select value={ref} onChange={(e) => setRef(e.target.value)}>
+            {choice.accounts.map((a) => <option key={a.ref} value={a.ref}>{a.name}</option>)}
+            <option value="">A new account…</option>
+          </select>
+        </label>
+        {!existing && (
+          <div className="grid2">
+            <label>New account name<input value={newName} placeholder="e.g. Visa card" onChange={(e) => setNewName(e.target.value)} /></label>
+            <label>Account type
+              <select value={kind} onChange={(e) => setKind(e.target.value as CsvMapping["account_kind"])}>
+                <option value="transaction">Transaction account</option>
+                <option value="credit_card">Credit card</option>
+              </select>
+            </label>
+          </div>
+        )}
+      </div>
+      <div className="row-actions">
+        <button className="primary" disabled={!name}
+          onClick={() => onImport({ ...choice.mapping, account_name: name, account_kind: existing ? (existing.kind as CsvMapping["account_kind"]) : kind })}>
+          Import into {existing ? existing.name : name || "the new account"}
+        </button>
+        <button onClick={onRemap}>Match the columns again</button>
+        <button onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function Done({ result, onView, onAnother, onUndo }: {
+  result: ImportResult; onView: () => void; onAnother: () => void; onUndo: () => void;
+}) {
   // Pending card transactions are swapped for their latest version on every import, so they aren't "new".
   const added = Math.max(0, result.rows_new - result.rows_pending_replaced);
   const nothingNew = added === 0;
@@ -111,6 +216,7 @@ function Done({ result, onView, onAnother }: { result: ImportResult; onView: () 
       <div className="row-actions">
         <button className="primary" onClick={onView}>See the overview</button>
         <button onClick={onAnother}>Import another file</button>
+        {result.rows_new > 0 && <button className="danger" onClick={onUndo}>Undo this import</button>}
       </div>
     </div>
   );

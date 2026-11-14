@@ -310,4 +310,5 @@ class GenericCsvConnector:
         return self.mapping.account_kind
 
     def is_internal_transfer(self, row: ParsedRow) -> bool:
-        return (row.bank_category or "").strip().lower() in {"internal transfers", "internal transfer", "transfers"}
+        # Only an explicit "internal" transfer: a plain "Transfers" category also covers money sent to other people.
+        return (row.bank_category or "").strip().lower() in {"internal transfers", "internal transfer"}
