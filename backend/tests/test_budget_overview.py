@@ -61,6 +61,12 @@ def test_overview_totals_and_budget(client):
     assert len(o["days"]) == 15 and o["days"][0]["date"] == "2026-11-01"
     assert o["insights"]["eating_out_count"] == 3
     assert o["merchants"][0]["spent"] is not None
+    # Categories come biggest first, each with a colour that doesn't depend on the month shown.
+    spent = [Decimal(c["spent"]) for c in o["categories"]]
+    assert spent == sorted(spent, reverse=True) and o["categories"][0]["color"] == 1
+    october = client.get(f"/api/groups/{gid}/overview", params={"period": "all"}).json()
+    colours = {c["name"]: c["color"] for c in october["categories"]}
+    assert all(colours[c["name"]] == c["color"] for c in o["categories"])
 
 
 def test_overview_by_account_and_all(client):

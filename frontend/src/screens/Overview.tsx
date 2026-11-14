@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, money, money0, type Account, type Overview as Data, type PostLine, type Transaction } from "../api";
-import { Calendar, Donut, SpendChart, postColor } from "../components/charts";
+import { Calendar, Donut, SpendChart, postColor, type Slice } from "../components/charts";
+
+type Pick = Slice & { category_ids: string[] };
+type View = "categories" | "posts";
+
+function remembered(): View {
+  try { return localStorage.getItem("genie.breakdown") === "posts" ? "posts" : "categories"; } catch { return "categories"; }
+}
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
 const dayLabel = (s: string) => new Date(s + "T00:00").toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
@@ -12,6 +19,7 @@ export default function Overview({ gid, onSetBudget }: { gid: string; onSetBudge
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [error, setError] = useState("");
   const [post, setPost] = useState<string | null>(null);
+  const [view, setView] = useState<View>(remembered);
   const [day, setDay] = useState<string | null>(null);
 
   useEffect(() => { api.accounts(gid).then(setAccounts).catch(() => {}); }, [gid]);
@@ -34,7 +42,8 @@ export default function Overview({ gid, onSetBudget }: { gid: string; onSetBudge
   const accName = new Map(accounts.map((a) => [a.id, a.name]));
   const postById = new Map(data.posts.map((x) => [x.id, x]));
   const budgeted = data.posts.filter((x) => x.id !== "none");
-  const biggestPost = data.posts.find((x) => Number(x.spent) > 0);
+  const biggestCat = data.categories.find((x) => Number(x.spent) > 0);
+  const shownView: View = budgeted.length ? view : "categories";
   const total = Number(data.total);
   const isCurrent = p.elapsed < 1;
 
@@ -69,8 +78,8 @@ export default function Overview({ gid, onSetBudget }: { gid: string; onSetBudge
           <div><span>Per day</span><b>{money0(data.per_day)}</b></div>
           <div><span>Purchases</span><b>{data.purchases}</b></div>
           <div>
-            <span>Biggest post</span>
-            <b>{biggestPost ? <><i className="dot" style={{ background: postColor(biggestPost.color) }} />{biggestPost.name}</> : "None"}</b>
+            <span>Biggest category</span>
+            <b>{biggestCat ? <><i className="dot" style={{ background: postColor(biggestCat.color) }} />{biggestCat.name} <em className="muted">{pct(Number(biggestCat.spent), total)}%</em></> : "None"}</b>
           </div>
           <div><span>Largest purchase</span><b>{data.biggest_purchase ? `${money0(data.biggest_purchase.spent)} · ${data.biggest_purchase.name}` : "None"}</b></div>
         </div>
@@ -81,6 +90,14 @@ export default function Overview({ gid, onSetBudget }: { gid: string; onSetBudge
         )}
       </div>
 
+      <WhereItWent data={data} view={shownView} setView={(v) => { setView(v); setPost(null); try { localStorage.setItem("genie.breakdown", v); } catch { /* private mode */ } }}
+        selected={post} onSelect={(id) => { setPost(id); setDay(null); }} />
+
+      {(post || day) && (
+        <Drill gid={gid} pick={post ? picks(data, shownView).find((x) => x.id === post) ?? null : null} day={day} period={p} accountId={accountId}
+          accName={accName} onClose={() => { setPost(null); setDay(null); }} />
+      )}
+
       <div className="card">
         <h2>Running total</h2>
         <p className="muted small">How spending adds up over {isCurrent ? "the month so far" : "the period"}, and each day split by budget post. Tap a day to see it.</p>
@@ -89,26 +106,7 @@ export default function Overview({ gid, onSetBudget }: { gid: string; onSetBudge
 
       <Insights data={data} />
 
-      <div className="two-col">
-        <div className="card">
-          <h2>Where it went</h2>
-          <p className="muted small">By budget post. Tap one to see its transactions.</p>
-          <div className="where">
-            <Donut posts={data.posts} total={data.total} selected={post} onSelect={(id) => { setPost(id); setDay(null); }} />
-            <ul className="bars">
-              {data.posts.filter((x) => Number(x.spent) > 0).map((x) => (
-                <li key={x.id} className={post && post !== x.id ? "dim" : ""} onClick={() => { setPost(post === x.id ? null : x.id); setDay(null); }}>
-                  <div className="bar-row">
-                    <span><i className="dot" style={{ background: postColor(x.color) }} />{x.name}</span>
-                    <span className="num">{money0(x.spent)} <em>{pct(Number(x.spent), total)}%</em></span>
-                  </div>
-                  <div className="track"><div style={{ width: `${pct(Number(x.spent), Number(data.posts[0].spent))}%`, background: postColor(x.color) }} /></div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
+      <div className="budget-wrap">
         <div className="card">
           <div className="card-head">
             <h2>Budget</h2>
@@ -122,16 +120,11 @@ export default function Overview({ gid, onSetBudget }: { gid: string; onSetBudge
                 <span>{h.name}</span>
                 <span className="num">{money0(h.spent)}{h.over > 0 && <b className="over-chip">⚠ {h.over} over</b>}</span>
               </div>
-              {budgeted.filter((x) => x.heading === h.name).map((x) => <BudgetRow key={x.id} line={x} onClick={() => { setPost(x.id); setDay(null); }} />)}
+              {budgeted.filter((x) => x.heading === h.name).map((x) => <BudgetRow key={x.id} line={x} onClick={() => { setView("posts"); setPost(x.id); setDay(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} />)}
             </div>
           ))}
         </div>
       </div>
-
-      {(post || day) && (
-        <Drill gid={gid} post={post ? postById.get(post) ?? null : null} day={day} period={p} accountId={accountId}
-          accName={accName} onClose={() => { setPost(null); setDay(null); }} />
-      )}
 
       <div className="three-col">
         <div className="card">
@@ -257,8 +250,8 @@ function Insights({ data }: { data: Data }) {
   );
 }
 
-function Drill({ gid, post, day, period, accountId, accName, onClose }: {
-  gid: string; post: PostLine | null; day: string | null; period: Data["period"]; accountId?: string;
+function Drill({ gid, pick: post, day, period, accountId, accName, onClose }: {
+  gid: string; pick: Pick | null; day: string | null; period: Data["period"]; accountId?: string;
   accName: Map<string, string>; onClose: () => void;
 }) {
   const [items, setItems] = useState<Transaction[] | null>(null);
@@ -288,6 +281,52 @@ function Drill({ gid, post, day, period, accountId, accName, onClose }: {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function picks(data: Data, view: View): Pick[] {
+  if (view === "posts") {
+    return data.posts.map((x) => ({ id: x.id, name: x.name, color: x.color, spent: x.spent, category_ids: x.category_ids }));
+  }
+  return data.categories
+    .filter((c) => c.id !== null)
+    .map((c) => ({ id: c.id as string, name: c.name, color: c.color, spent: c.spent, category_ids: [c.id as string] }));
+}
+
+function WhereItWent({ data, view, setView, selected, onSelect }: {
+  data: Data; view: View; setView: (v: View) => void; selected: string | null; onSelect: (id: string | null) => void;
+}) {
+  const hasBudget = data.posts.some((x) => x.id !== "none");
+  const items = picks(data, hasBudget ? view : "categories").filter((x) => Number(x.spent) > 0);
+  const total = Number(data.total);
+  const top = Number(items[0]?.spent ?? 0);
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>Where it went</h2>
+        {hasBudget && (
+          <div className="segmented small">
+            <button className={view === "categories" ? "on" : ""} onClick={() => setView("categories")}>Categories</button>
+            <button className={view === "posts" ? "on" : ""} onClick={() => setView("posts")}>Budget posts</button>
+          </div>
+        )}
+      </div>
+      <p className="muted small">Biggest first. Tap one to see its transactions.</p>
+      <div className="where">
+        <Donut items={items} total={data.total} selected={selected} onSelect={onSelect} />
+        <ul className="bars">
+          {items.map((x) => (
+            <li key={x.id} className={selected && selected !== x.id ? "dim" : ""} onClick={() => onSelect(selected === x.id ? null : x.id)}>
+              <div className="bar-row">
+                <span><i className="dot" style={{ background: postColor(x.color) }} />{x.name}</span>
+                <span className="num">{money(x.spent)} <em>{pct(Number(x.spent), total)}%</em></span>
+              </div>
+              <div className="track"><div style={{ width: `${pct(Number(x.spent), top)}%`, background: postColor(x.color) }} /></div>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

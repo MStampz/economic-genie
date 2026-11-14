@@ -43,7 +43,7 @@ export type Overview = {
   total: string; purchases: number; refunds: string; per_day: string; biggest_purchase: MerchantLine | null;
   days: DayLine[]; posts: PostLine[];
   headings: { id: string; name: string; spent: string; budget: string | null; over: number }[];
-  categories: { id: string | null; name: string; spent: string; count: number; post_id: string }[];
+  categories: { id: string | null; name: string; spent: string; count: number; post_id: string; color: number }[];
   accounts: { id: string; name: string; spent: string; count: number; top_post: string | null }[];
   merchants: MerchantLine[];
   recurring: { name: string; amount: string; count: number; last_date: string }[];

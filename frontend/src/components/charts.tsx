@@ -104,17 +104,19 @@ export function SpendChart({ days, posts, onDay }: { days: DayLine[]; posts: Pos
   );
 }
 
-/** Donut of spending by budget post. */
-export function Donut({ posts, total, selected, onSelect }: {
-  posts: PostLine[]; total: string; selected: string | null; onSelect: (id: string | null) => void;
+export type Slice = { id: string; name: string; color: number; spent: string };
+
+/** Donut of spending split by category or by budget post. */
+export function Donut({ items, total, selected, onSelect }: {
+  items: Slice[]; total: string; selected: string | null; onSelect: (id: string | null) => void;
 }) {
-  const parts = posts.filter((p) => Number(p.spent) > 0);
+  const parts = items.filter((p) => Number(p.spent) > 0);
   const sum = parts.reduce((a, p) => a + Number(p.spent), 0) || 1;
   const R = 70, r = 50, C = 90;
   let a0 = -Math.PI / 2;
   const sel = parts.find((p) => p.id === selected);
   return (
-    <svg viewBox="0 0 180 180" className="donut" role="img" aria-label="Spending by budget post">
+    <svg viewBox="0 0 180 180" className="donut" role="img" aria-label="Spending breakdown">
       {parts.map((p) => {
         const frac = Number(p.spent) / sum;
         const a1 = a0 + frac * Math.PI * 2;

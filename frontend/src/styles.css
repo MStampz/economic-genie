@@ -287,3 +287,9 @@ select option { background: var(--bg-2); }
 .stats b { display: block; }
 .budget-summary .bar-row { flex-wrap: wrap; }
 .two-col > *, .three-col > *, .insights > * { min-width: 0; }
+
+.budget-wrap { margin-bottom: 14px; }
+.budget-wrap .card { margin: 0; }
+.segmented.small button { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+.stats em { font-style: normal; font-weight: 500; font-size: 13px; margin-left: 4px; }
+@media (min-width: 760px) { .where .donut { width: 220px; height: 220px; flex-shrink: 0; } }
