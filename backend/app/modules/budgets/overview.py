@@ -83,6 +83,7 @@ class CategoryLine(BaseModel):
     spent: Decimal
     count: int
     post_id: str
+    color: int  # 1-8 for the group's biggest categories over all data, 0 (neutral) for the rest
 
 
 class AccountLine(BaseModel):
@@ -185,6 +186,13 @@ def overview(
     all_tx = [t for t in db.scalars(select(Transaction).where(*conds)) if counts(t)]
 
     months = sorted({t.posted_date.strftime("%Y-%m") for t in all_tx}, reverse=True)
+
+    # A category keeps the same colour in every month: slots go to the biggest categories over all data.
+    lifetime: dict[uuid.UUID | None, Decimal] = defaultdict(lambda: ZERO)
+    for t in all_tx:
+        lifetime[t.category_id] -= t.amount
+    ranked = [cid for cid, v in sorted(lifetime.items(), key=lambda kv: -kv[1]) if cid is not None and v > 0]
+    cat_color = {cid: i + 1 for i, cid in enumerate(ranked[:8])}
     key = period or (months[0] if months else today.strftime("%Y-%m"))
     if key == "all":
         start = min((t.posted_date for t in all_tx), default=today)
@@ -362,6 +370,7 @@ def overview(
                     spent=v,
                     count=count_cat.get(cid, 0),
                     post_id=post_of.get(cid, "none") if cid else "none",
+                    color=cat_color.get(cid, 0),
                 )
                 for cid, v in by_cat.items()
             ),
