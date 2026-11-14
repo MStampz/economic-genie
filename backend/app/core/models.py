@@ -25,6 +25,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -238,8 +239,13 @@ class Transaction(Base):
     category_source: Mapped[str] = mapped_column(String(16), default="bank")
 
     # Money moving between the group's own accounts (e.g. paying the credit card). Not spending.
+    # is_internal_transfer is the result; app.core.transfers works it out from the three inputs below.
     is_internal_transfer: Mapped[bool] = mapped_column(Boolean, default=False)
     transfer_pair_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    # What the bank file itself said (e.g. NAB's "CREDIT CARD PAYMENT"), kept so a pair can be undone.
+    source_transfer: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # A person's choice: True = a transfer, False = never a transfer, None = automatic.
+    transfer_user: Mapped[bool | None] = mapped_column(Boolean)
 
     # Prepared for the AI coach; always empty in increment 1.
     value_tag: Mapped[str | None] = mapped_column(String(16))

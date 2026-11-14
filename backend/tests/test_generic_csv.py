@@ -113,10 +113,15 @@ def test_unknown_layout_is_learned_once(client):
     body = r.json()
     assert body["rows_new"] == 3 and body["accounts"] == ["CBA Everyday"] and body["format"] == "CBA everyday"
 
-    # Next time the same layout is recognised without a mapping, and nothing is imported twice.
+    # Next time the layout is recognised, but the file doesn't name its account, so the app asks which one.
     p = _post(client, gid, "imports/preview", "cba_noheader.csv").json()
-    assert p["status"] == "saved" and p["format"] == "CBA everyday" and len(p["parsed"]) == 3
-    body = _post(client, gid, "imports", "cba_noheader.csv").json()
+    assert p["status"] == "confirm_account" and p["format"] == "CBA everyday" and len(p["parsed"]) == 3
+    choice = p["account_choice"]
+    assert choice["suggested_ref"] == "Everyday"
+    assert choice["accounts"] == [{"ref": "Everyday", "name": "CBA Everyday", "kind": "transaction"}]
+    assert _post(client, gid, "imports", "cba_noheader.csv").status_code == 422
+    chosen = json.dumps({**choice["mapping"], "account_name": "Everyday"})
+    body = _post(client, gid, "imports", "cba_noheader.csv", mapping=chosen, save_as="CBA everyday").json()
     assert body["rows_new"] == 0 and body["rows_duplicate"] == 3
 
     profiles = client.get(f"/api/groups/{gid}/import-profiles").json()
@@ -140,3 +145,23 @@ def test_invalid_mapping_message(client):
     bad = json.dumps({"date": "Column 1", "description": ["Column 3"], "account_name": "x"})
     r = _post(client, gid, "imports/preview", "cba_noheader.csv", mapping=bad)
     assert r.status_code == 422 and "amount column" in r.json()["detail"]
+
+
+def test_same_layout_for_a_second_account_goes_where_chosen(client):
+    """Banks like CBA export the same columns for every account: the second account must not land in the first."""
+    register(client)
+    gid = new_group(client)
+    _post(client, gid, "imports", "cba_noheader.csv", mapping=json.dumps(CBA), save_as="CBA")
+    card = b'10/11/2026,"-99.00","JB HIFI","-500.00"\n'
+    p = client.post(f"/api/groups/{gid}/imports/preview", files={"file": ("card.csv", card, "text/csv")}).json()
+    assert p["status"] == "confirm_account"
+    mapping = {**p["account_choice"]["mapping"], "account_name": "Card", "account_kind": "credit_card"}
+    r = client.post(
+        f"/api/groups/{gid}/imports",
+        files={"file": ("card.csv", card, "text/csv")},
+        data={"mapping": json.dumps(mapping), "save_as": "CBA"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["accounts_created"] == ["CBA Card"]
+    kinds = {a["name"]: a["kind"] for a in client.get(f"/api/groups/{gid}/accounts").json()}
+    assert kinds == {"CBA Everyday": "transaction", "CBA Card": "credit_card"}

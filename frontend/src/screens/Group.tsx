@@ -7,6 +7,8 @@ const ACTIONS: Record<string, string> = {
   "import.completed": "imported transactions", "rule.created": "added a rule", "rule.deleted": "removed a rule",
   "rule.applied": "applied rules", "rule.imported": "imported rules", "category.created": "added a category",
   "transaction.categorised": "changed a category", "account.updated": "renamed an account",
+  "account.deleted": "deleted an account", "transaction.deleted": "deleted a transaction",
+  "transaction.transfer_set": "changed whether a transaction is a transfer", "import.undone": "undid an import",
 };
 
 export default function GroupScreen({ gid, me, isOwner, onLeft, onSignedOut }: {
@@ -65,10 +67,17 @@ export default function GroupScreen({ gid, me, isOwner, onLeft, onSignedOut }: {
           {accounts.map((a) => (
             <li key={a.id}>
               <span>{a.name} <span className="muted">· {a.kind === "credit_card" ? "credit card" : "transaction"}</span></span>
+              <span>
               <button className="link" onClick={() => {
                 const name = prompt("Account name", a.name);
                 if (name) act(() => api.renameAccount(gid, a.id, name));
               }}>Rename</button>
+              {isOwner && (
+                <button className="link danger" onClick={() => {
+                  if (confirm(`Delete ${a.name} and all its transactions? This can't be undone.`)) act(() => api.deleteAccount(gid, a.id));
+                }}>Delete</button>
+              )}
+              </span>
             </li>
           ))}
           {accounts.length === 0 && <li className="muted">Accounts appear when you import a file.</li>}

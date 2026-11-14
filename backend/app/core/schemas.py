@@ -159,6 +159,8 @@ class TransactionOut(Out):
     category_id: uuid.UUID | None
     category_source: str
     is_internal_transfer: bool
+    transfer_user: bool | None
+    import_batch_id: uuid.UUID | None
 
 
 class TransactionPage(BaseModel):
@@ -167,8 +169,12 @@ class TransactionPage(BaseModel):
 
 
 class TransactionPatch(BaseModel):
+    """Only the fields sent change."""
+
     # Set a category by hand, or null to hand the transaction back to the rules and the bank.
-    category_id: uuid.UUID | None
+    category_id: uuid.UUID | None = None
+    # True = a transfer between the group's own accounts, False = never one, null = let the app decide.
+    is_transfer: bool | None = None
 
 
 class ImportResult(BaseModel):

@@ -73,7 +73,13 @@ def load_budget(db: Session, group_id: uuid.UUID) -> BudgetOut:
     ).all()
     posts = db.scalars(select(BudgetPost).where(BudgetPost.group_id == group_id).order_by(BudgetPost.position)).all()
     links: dict[uuid.UUID, list[uuid.UUID]] = {}
-    for link in db.scalars(select(BudgetPostCategory).where(BudgetPostCategory.group_id == group_id)):
+    # Ordered by category name, so the same budget always reads (and serialises) the same way.
+    for link in db.scalars(
+        select(BudgetPostCategory)
+        .join(Category, Category.id == BudgetPostCategory.category_id)
+        .where(BudgetPostCategory.group_id == group_id)
+        .order_by(Category.name, Category.id)
+    ):
         links.setdefault(link.post_id, []).append(link.category_id)
     return BudgetOut(
         headings=[

@@ -41,6 +41,23 @@ export default function Transactions({ gid }: { gid: string }) {
     setItems(items.map((x) => (x.id === t.id ? updated : x)));
   }
 
+  async function setTransfer(t: Transaction, value: boolean | null) {
+    try {
+      await api.setTransfer(gid, t.id, value);
+      // A change can pair or split the other leg too, so reload the page of results.
+      const p = await api.transactions(gid, { ...params, offset: 0, limit: Math.max(PAGE, items.length) });
+      setItems(p.items); setTotal(p.total);
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function remove(t: Transaction) {
+    if (!confirm(`Delete “${t.merchant || t.description}” (${money(t.amount)})? Importing the same file again brings it back.`)) return;
+    try {
+      await api.deleteTransaction(gid, t.id);
+      setItems(items.filter((x) => x.id !== t.id)); setTotal(total - 1);
+    } catch (e) { setError((e as Error).message); }
+  }
+
   const catName = new Map(cats.map((c) => [c.id, c.name]));
   const accName = new Map(accounts.map((a) => [a.id, a.name]));
   const byDay = new Map<string, Transaction[]>();
@@ -66,6 +83,11 @@ export default function Transactions({ gid }: { gid: string }) {
                 <div className="tx-sub">
                   {accName.get(t.account_id) ?? ""}{t.is_pending && <span className="badge">pending</span>}
                   {t.is_internal_transfer && <span className="badge">own transfer</span>}
+                  {t.is_internal_transfer
+                    ? <button className="link" onClick={() => setTransfer(t, false)}>Not a transfer</button>
+                    : <button className="link" onClick={() => setTransfer(t, true)}>Mark as own transfer</button>}
+                  {t.transfer_user !== null && <button className="link" onClick={() => setTransfer(t, null)} title="Let the app decide again">↺ Automatic</button>}
+                  <button className="link danger" onClick={() => remove(t)}>Delete</button>
                 </div>
               </div>
               <div className="tx-side">

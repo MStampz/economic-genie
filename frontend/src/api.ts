@@ -8,9 +8,10 @@ export type Rule = { id: string; pattern: string; is_regex: boolean; category_id
 export type Transaction = {
   id: string; account_id: string; posted_date: string; amount: string; description: string; merchant: string | null;
   bank_type: string | null; is_pending: boolean; category_id: string | null; category_source: string; is_internal_transfer: boolean;
+  transfer_user: boolean | null; import_batch_id: string | null;
 };
 export type ImportResult = {
-  rows_total: number; rows_new: number; rows_duplicate: number; rows_pending_replaced: number; accounts_created: string[];
+  batch_id: string; rows_total: number; rows_new: number; rows_duplicate: number; rows_pending_replaced: number; accounts_created: string[];
   accounts: string[]; transfers_paired: number; format: string; filename: string | null;
 };
 export type CsvMapping = {
@@ -20,9 +21,16 @@ export type CsvMapping = {
   account_column: string | null; account_name: string | null; account_kind: "transaction" | "credit_card"; institution: string;
 };
 export type ImportPreview = {
-  status: "recognised" | "saved" | "needs_mapping" | "mapping"; format: string | null; columns: string[]; has_header: boolean;
+  status: "recognised" | "saved" | "confirm_account" | "needs_mapping" | "mapping"; format: string | null; columns: string[]; has_header: boolean;
   sample: string[][]; suggested: Partial<CsvMapping>; parsed: { date: string; amount: string; description: string; account: string }[];
   error: string | null;
+  account_choice: AccountChoice | null;
+};
+export type AccountChoice = {
+  layout: string; mapping: CsvMapping; suggested_ref: string; accounts: { ref: string; name: string; kind: string }[];
+};
+export type ImportBatch = {
+  id: string; created_at: string; filename: string | null; source: string; rows_new: number; remaining: number; accounts: string[];
 };
 export type AuditEvent = { at: string; action: string; user_id: string | null; detail: Record<string, unknown> | null };
 
@@ -143,6 +151,13 @@ export const api = {
   },
   importFile: (gid: string, file: File, mapping?: CsvMapping, saveAs?: string) =>
     call<ImportResult>("POST", `${g(gid)}/imports`, form(file, mapping, saveAs)),
+  setTransfer: (gid: string, id: string, is_transfer: boolean | null) =>
+    call<Transaction>("PATCH", `${g(gid)}/transactions/${id}`, { is_transfer }),
+  deleteTransaction: (gid: string, id: string) => call<void>("DELETE", `${g(gid)}/transactions/${id}`),
+  deleteAccount: (gid: string, id: string) => call<void>("DELETE", `${g(gid)}/accounts/${id}`),
+  imports: (gid: string) => call<ImportBatch[]>("GET", `${g(gid)}/imports`),
+  undoImport: (gid: string, id: string) =>
+    call<{ removed: number; accounts_removed: string[] }>("DELETE", `${g(gid)}/imports/${id}`),
   importProfiles: (gid: string) => call<{ id: string; name: string; institution: string }[]>("GET", `${g(gid)}/import-profiles`),
   deleteImportProfile: (gid: string, id: string) => call<void>("DELETE", `${g(gid)}/import-profiles/${id}`),
 };

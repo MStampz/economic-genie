@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core import audit
 from app.core.categories import Categoriser, get_or_create_category, validate_regex, visible_categories
-from app.core.deps import GroupAccess, group_access
+from app.core.deps import GroupAccess, group_access, owner_access
 from app.core.models import Account, Category, CategoryRule, Membership, Transaction
 from app.core.schemas import (
     AccountOut,
@@ -24,6 +24,7 @@ from app.core.schemas import (
     TransactionPage,
     TransactionPatch,
 )
+from app.core.transfers import delete_transactions, pair_transfers, recategorise, refresh, unpair
 from app.db import get_db
 
 router = APIRouter(prefix="/api/groups/{group_id}", tags=["finance"])
@@ -61,6 +62,19 @@ def update_account(
     return account
 
 
+@router.delete("/accounts/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(account_id: uuid.UUID, access: GroupAccess = Depends(owner_access), db: Session = Depends(get_db)):
+    """Deletes an account and all its transactions. Only the group's owners can do this."""
+    account = _get(db, Account, account_id, access, "Account")
+    txs = list(db.scalars(select(Transaction).where(Transaction.account_id == account.id)))
+    removed = delete_transactions(db, access.group.id, txs)
+    db.delete(account)
+    audit.log(
+        db, "account.deleted", user_id=access.user.id, group_id=access.group.id, name=account.name, removed=removed
+    )
+    db.commit()
+
+
 # ---- categories
 
 
@@ -95,7 +109,7 @@ def delete_category(category_id: uuid.UUID, access: GroupAccess = Depends(group_
     db.flush()
     categoriser = Categoriser(db, access.group.id)
     for t in affected:
-        _recategorise(t, categoriser)
+        recategorise(t, categoriser)
     audit.log(db, "category.deleted", user_id=access.user.id, group_id=access.group.id, name=c.name)
     db.commit()
 
@@ -193,7 +207,7 @@ def apply_rules(access: GroupAccess = Depends(group_access), db: Session = Depen
     for t in db.scalars(
         select(Transaction).where(Transaction.group_id == access.group.id, Transaction.category_source != "user")
     ):
-        if _recategorise(t, categoriser):
+        if recategorise(t, categoriser):
             updated += 1
     audit.log(db, "rule.applied", user_id=access.user.id, group_id=access.group.id, updated=updated)
     db.commit()
@@ -255,18 +269,55 @@ def update_transaction(
     access: GroupAccess = Depends(group_access),
     db: Session = Depends(get_db),
 ):
+    """Sets a category and/or whether it is a transfer between the group's own accounts.
+
+    Only the fields sent are changed. null hands the choice back to the app (rules, the bank, matching).
+    """
     t = _get(db, Transaction, transaction_id, access, "Transaction")
-    if body.category_id is None:
-        t.category_source = "bank"
-        _recategorise(t, Categoriser(db, access.group.id))
-    else:
-        c = db.get(Category, body.category_id)
-        if c is None or c.group_id not in (None, access.group.id):
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category.")
-        t.category_id, t.category_source = c.id, "user"
-    audit.log(db, "transaction.categorised", user_id=access.user.id, group_id=access.group.id, transaction=str(t.id))
+    sent = body.model_fields_set
+    categoriser = Categoriser(db, access.group.id)
+    if "category_id" in sent:
+        if body.category_id is None:
+            t.category_source = "bank"
+            recategorise(t, categoriser)
+        else:
+            c = db.get(Category, body.category_id)
+            if c is None or c.group_id not in (None, access.group.id):
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category.")
+            t.category_id, t.category_source = c.id, "user"
+        audit.log(
+            db, "transaction.categorised", user_id=access.user.id, group_id=access.group.id, transaction=str(t.id)
+        )
+    if "is_transfer" in sent:
+        t.transfer_user = body.is_transfer
+        if body.is_transfer is False:
+            unpair(db, t, categoriser)
+        refresh(t, categoriser)
+        if body.is_transfer is None:
+            db.flush()
+            pair_transfers(db, access.group.id, categoriser)
+        audit.log(
+            db,
+            "transaction.transfer_set",
+            user_id=access.user.id,
+            group_id=access.group.id,
+            transaction=str(t.id),
+            is_transfer=body.is_transfer,
+        )
     db.commit()
+    db.refresh(t)
     return t
+
+
+@router.delete("/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction(
+    transaction_id: uuid.UUID, access: GroupAccess = Depends(group_access), db: Session = Depends(get_db)
+):
+    t = _get(db, Transaction, transaction_id, access, "Transaction")
+    detail = {"transaction": str(t.id), "date": t.posted_date.isoformat(), "amount": str(t.amount)}
+    delete_transactions(db, access.group.id, [t])
+    audit.log(db, "transaction.deleted", user_id=access.user.id, group_id=access.group.id, **detail)
+    db.commit()
 
 
 # ---- helpers
@@ -285,19 +336,3 @@ def _check_rule(db: Session, access: GroupAccess, body: RuleIn) -> None:
     c = db.get(Category, body.category_id)
     if c is None or c.group_id not in (None, access.group.id):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category.")
-
-
-def _recategorise(t: Transaction, categoriser: Categoriser) -> bool:
-    """Recomputes a category that wasn't chosen by hand. Returns True if it changed."""
-    if t.category_source == "user":
-        return False
-    # A transfer paired between the group's own accounts keeps the transfer category.
-    category_id, source = categoriser.resolve(
-        description=t.description,
-        merchant=t.merchant,
-        bank_category=t.bank_category,
-        is_transfer=t.is_internal_transfer,
-    )
-    changed = (category_id, source) != (t.category_id, t.category_source)
-    t.category_id, t.category_source = category_id, source
-    return changed
