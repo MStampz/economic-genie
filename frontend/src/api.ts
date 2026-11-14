@@ -26,6 +26,34 @@ export type ImportPreview = {
 };
 export type AuditEvent = { at: string; action: string; user_id: string | null; detail: Record<string, unknown> | null };
 
+export type BudgetPost = {
+  id: string; heading_id: string; name: string; color: number; position: number; monthly_amount: string | null; category_ids: string[];
+};
+export type BudgetHeading = { id: string; name: string; position: number; posts: BudgetPost[] };
+export type Budget = { headings: BudgetHeading[] };
+export type PostLine = {
+  id: string; name: string; heading: string | null; color: number; spent: string; count: number;
+  budget: string | null; pace: string | null; category_ids: string[];
+};
+export type DayLine = { date: string; total: string; by_post: Record<string, string> };
+export type MerchantLine = { name: string; spent: string; count: number };
+export type Overview = {
+  period: { key: string; label: string; start: string; end: string; days: number; data_from: string | null; data_to: string | null; days_with_data: number; elapsed: number };
+  months: { key: string; label: string }[];
+  total: string; purchases: number; refunds: string; per_day: string; biggest_purchase: MerchantLine | null;
+  days: DayLine[]; posts: PostLine[];
+  headings: { id: string; name: string; spent: string; budget: string | null; over: number }[];
+  categories: { id: string | null; name: string; spent: string; count: number; post_id: string }[];
+  accounts: { id: string; name: string; spent: string; count: number; top_post: string | null }[];
+  merchants: MerchantLine[];
+  recurring: { name: string; amount: string; count: number; last_date: string }[];
+  insights: {
+    eating_out_total: string; eating_out_count: number; eating_out_per_week: string; most_frequent: MerchantLine | null;
+    biggest_day: DayLine | null; biggest_day_merchants: string[]; fees_total: string; fees_count: number;
+  };
+  budgets_set: number; budgets_over: number; budget_total: string; budget_spent: string;
+};
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -82,8 +110,28 @@ export const api = {
   applyRules: (gid: string) => call<{ updated: number }>("POST", `${g(gid)}/rules/apply`),
   importRules: (gid: string, rules: unknown) => call<{ updated: number }>("POST", `${g(gid)}/rules/import`, rules),
 
-  transactions: (gid: string, params: Record<string, string | number | boolean>) => {
-    const qs = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
+  overview: (gid: string, period?: string, accountId?: string) => {
+    const qs = new URLSearchParams();
+    if (period) qs.set("period", period);
+    if (accountId) qs.set("account_id", accountId);
+    return call<Overview>("GET", `${g(gid)}/overview?${qs}`);
+  },
+  budget: (gid: string) => call<Budget>("GET", `${g(gid)}/budget`),
+  starterBudget: (gid: string) => call<Budget>("POST", `${g(gid)}/budget/starter`),
+  addHeading: (gid: string, name: string) => call<Budget>("POST", `${g(gid)}/budget/headings`, { name }),
+  renameHeading: (gid: string, id: string, name: string) => call<Budget>("PATCH", `${g(gid)}/budget/headings/${id}`, { name }),
+  deleteHeading: (gid: string, id: string) => call<Budget>("DELETE", `${g(gid)}/budget/headings/${id}`),
+  addPost: (gid: string, heading_id: string, name: string) => call<Budget>("POST", `${g(gid)}/budget/posts`, { heading_id, name }),
+  updatePost: (gid: string, id: string, patch: Record<string, unknown>) => call<Budget>("PATCH", `${g(gid)}/budget/posts/${id}`, patch),
+  deletePost: (gid: string, id: string) => call<Budget>("DELETE", `${g(gid)}/budget/posts/${id}`),
+  reorderBudget: (gid: string, headings: { id: string; post_ids: string[] }[]) => call<Budget>("PUT", `${g(gid)}/budget/order`, { headings }),
+
+  transactions: (gid: string, params: Record<string, string | number | boolean | string[]>) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (Array.isArray(v)) v.forEach((x) => qs.append(k, x));
+      else qs.set(k, String(v));
+    }
     return call<{ items: Transaction[]; total: number }>("GET", `${g(gid)}/transactions?${qs}`);
   },
   setCategory: (gid: string, id: string, category_id: string | null) =>
@@ -101,3 +149,5 @@ export const api = {
 
 export const money = (v: string | number, currency = "AUD") =>
   new Intl.NumberFormat("en-AU", { style: "currency", currency }).format(Number(v));
+export const money0 = (v: string | number, currency = "AUD") =>
+  new Intl.NumberFormat("en-AU", { style: "currency", currency, maximumFractionDigits: 0 }).format(Number(v));

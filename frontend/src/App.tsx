@@ -4,14 +4,16 @@ import Auth from "./screens/Auth";
 import Onboard from "./screens/Onboard";
 import Transactions from "./screens/Transactions";
 import Import from "./screens/Import";
-import Rules from "./screens/Rules";
+import Overview from "./screens/Overview";
+import Budget from "./screens/Budget";
 import GroupScreen from "./screens/Group";
 
-type Tab = "transactions" | "import" | "rules" | "group";
+type Tab = "overview" | "transactions" | "budget" | "import" | "group";
 const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: "overview", label: "Overview", icon: "◔" },
   { id: "transactions", label: "Activity", icon: "≡" },
+  { id: "budget", label: "Budget", icon: "▤" },
   { id: "import", label: "Import", icon: "⇪" },
-  { id: "rules", label: "Rules", icon: "⚙" },
   { id: "group", label: "Family", icon: "◎" },
 ];
 
@@ -25,7 +27,8 @@ function remember(key: string, value: string) {
 export default function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
   const [groupId, setGroupId] = useState<string | null>(remembered("genie.group"));
-  const [tab, setTab] = useState<Tab>((remembered("genie.tab") as Tab) || "transactions");
+  const saved = remembered("genie.tab") as Tab | null;
+  const [tab, setTab] = useState<Tab>(saved && TABS.some((t) => t.id === saved) ? saved : "overview");
 
   const refresh = useCallback(async () => {
     try {
@@ -56,9 +59,10 @@ export default function App() {
         ) : <span className="group-name">{group.group_name}</span>}
       </header>
       <main className="content">
+        {tab === "overview" && <Overview gid={group.group_id} onSetBudget={() => pick("budget")} />}
         {tab === "transactions" && <Transactions gid={group.group_id} />}
-        {tab === "import" && <Import gid={group.group_id} onImported={() => pick("transactions")} />}
-        {tab === "rules" && <Rules gid={group.group_id} />}
+        {tab === "budget" && <Budget gid={group.group_id} />}
+        {tab === "import" && <Import gid={group.group_id} onImported={() => pick("overview")} />}
         {tab === "group" && (
           <GroupScreen gid={group.group_id} me={me} isOwner={group.role === "owner"}
             onLeft={async () => { setGroupId(null); await refresh(); }}

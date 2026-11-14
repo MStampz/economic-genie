@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main  # noqa: F401  (registers every table, modules included)
 from app import db as dbmod
 from app.config import get_settings
 from app.core.categories import ensure_default_categories

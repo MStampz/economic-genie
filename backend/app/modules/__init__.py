@@ -4,4 +4,4 @@ A module is a package with a `router` and an optional `FEATURE_FLAG` setting nam
 MODULES is all it takes to switch it on; the core never imports a module directly.
 """
 
-MODULES: list[str] = []
+MODULES: list[str] = ["budgets"]

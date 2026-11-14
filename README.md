@@ -3,9 +3,9 @@
 A family finance app: import your bank transactions, categorise spending, and (soon) track it against a budget.
 It runs on your own Mac with Docker Desktop and is built so it can move to cloud hosting later.
 
-**Status:** increment 1 (the core) is built: logins, family groups with invite codes, NAB CSV import, internal
-transfer detection and category rules. Next is increment 2 (spending overview and budgets, as prototyped), then
-increment 3 (the AI coach).
+**Status:** increment 1 (the core: logins, family groups with invite codes, CSV import from any bank, internal
+transfer detection, category rules) and increment 2 (the spending overview and budgets, as prototyped) are built.
+Next is increment 3 (the AI coach).
 
 ## Run it on your Mac
 
@@ -37,6 +37,17 @@ Export a CSV file from your bank's internet banking and drop it on the **Import*
 
 Every source becomes the same common row (`ParsedRow`) before it is stored, so open banking (Basiq, Fiskil) will be
 one more connector in `backend/app/ingestion/connectors/` feeding the same pipeline.
+
+## Overview and budget
+
+The **Overview** tab shows a month (or all data, or one account): total spent, the running total with daily spending
+split by budget post, insights (eating out per week, most frequent merchant, biggest day, fees), where the money went,
+each budget post against its monthly amount (with a pace marker in the current month), a spending calendar, spending
+per account, top merchants and recurring charges. Tap a post or a day to see its transactions.
+
+The **Budget** tab sets up headings (e.g. "Faste udgifter") and posts (e.g. "Groceries og wine"). Each post covers one
+or more categories and can have a monthly amount; a category belongs to one post only. A new group can start from the
+prototype's budget. All figures are computed by the API (`app/modules/budgets/overview.py`), not in the browser.
 
 To load the rules from the prototype, open **Rules → Import rules (JSON)** and pick
 [`examples/prototype-rules.json`](examples/prototype-rules.json), then tap **Apply rules**.
