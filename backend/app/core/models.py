@@ -50,7 +50,7 @@ ROLES = ("owner", "member")
 ACCOUNT_KINDS = ("transaction", "credit_card")  # savings, loan, super, investment come later
 CATEGORY_KINDS = ("expense", "income", "transfer")
 # Who decided a category or value tag. A user's choice always wins over the others.
-SOURCES = ("bank", "rule", "user", "coach")
+SOURCES = ("bank", "rule", "auto", "user", "coach")
 # Hidden in increment 1, filled automatically by the AI coach later.
 VALUE_TAGS = ("valued", "necessity", "drift")
 
@@ -237,6 +237,8 @@ class Transaction(Base):
 
     category_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     category_source: Mapped[str] = mapped_column(String(16), default="bank")
+    # Why the app chose the category, for people (e.g. '"rent" in the text'). Empty for bank and hand picks.
+    category_reason: Mapped[str | None] = mapped_column(String(200))
 
     # Money moving between the group's own accounts (e.g. paying the credit card). Not spending.
     # is_internal_transfer is the result; app.core.transfers works it out from the three inputs below.

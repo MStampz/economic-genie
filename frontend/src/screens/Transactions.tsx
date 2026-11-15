@@ -93,7 +93,8 @@ export default function Transactions({ gid }: { gid: string }) {
               <div className="tx-side">
                 <div className={Number(t.amount) < 0 ? "amount out" : "amount in"}>{money(t.amount)}</div>
                 <select className={`cat-pick ${t.category_source}`} value={t.category_id ?? ""}
-                  title={t.category_source === "user" ? "Chosen by you" : t.category_source === "rule" ? "Set by a rule" : "From the bank"}
+                  title={t.category_source === "user" ? "Chosen by you" : t.category_source === "rule" ? "Set by a rule"
+                    : t.category_source === "auto" ? `Worked out by the app: ${t.category_reason ?? ""}` : "From the bank"}
                   onChange={(e) => setCategory(t, e.target.value)}>
                   <option value="">{t.category_source === "user" ? "↺ Automatic" : catName.get(t.category_id ?? "") ?? "Uncategorised"}</option>
                   {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

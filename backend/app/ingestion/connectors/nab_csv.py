@@ -14,7 +14,7 @@ from app.ingestion.connectors.base import ParsedRow, ParseError
 
 REQUIRED = ["Date", "Amount", "Account Number", "Transaction Type", "Transaction Details"]
 TRANSFER_TYPES = {"CREDIT CARD PAYMENT"}
-TRANSFER_CATEGORIES = {"internal transfers"}
+TRANSFER_CATEGORIES = {"internal transfers", "credit card repayments"}
 DATE_FORMATS = ("%d %b %y", "%d %b %Y", "%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d")
 
 
@@ -98,7 +98,9 @@ class NabCsvConnector:
         return rows
 
     def account_kind(self, account_ref: str) -> str:
-        return "credit_card" if "card" in account_ref.lower() else "transaction"
+        # "Card ending 3528", or a masked card number such as "453030xxxxxx3528" (NAB's card fee lines)
+        ref = account_ref.lower()
+        return "credit_card" if "card" in ref or "xxxx" in ref else "transaction"
 
     def is_internal_transfer(self, row: ParsedRow) -> bool:
         return (row.bank_type or "").upper() in TRANSFER_TYPES or (

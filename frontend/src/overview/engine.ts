@@ -14,7 +14,7 @@ export type EngineData = {
   recurring: Overview["recurring"];
 };
 export type EngineActions = {
-  setCategory: (txId: string, categoryId: string) => Promise<Transaction>;
+  setCategory: (txId: string, categoryId: string) => Promise<Transaction & { also_updated?: string[] }>;
   renameAccount: (id: string, name: string) => Promise<Account>;
   setPostAmount: (postId: string, amount: number | null) => Promise<Budget>;
   linkBudget: (name: string, categoryIds: string[], amount: number) => Promise<{ budget: Budget; postId: string }>;
@@ -175,7 +175,7 @@ export function mount(root: HTMLElement, data: EngineData, act: EngineActions): 
     const counts = a > 0 ? c && c.kind === "expense" && c.name !== "Uncategorised" : !c || c.kind === "expense";
     if (!counts) continue;
     TX.push({ id: t.id, i: i++, d: t.posted_date, spend: -a, c: t.account_id, desc: t.description, cid: t.category_id ?? uncId,
-      merch: cleanMerchant(t.merchant, t.description), p: t.is_pending, src: t.category_source });
+      merch: cleanMerchant(t.merchant, t.description), p: t.is_pending, src: t.category_source, why: t.category_reason ?? "" });
   }
   const catOf = (t) => catName(t.cid);
   const groupOf = (t) => groupOfName(catOf(t));
@@ -547,7 +547,7 @@ export function mount(root: HTMLElement, data: EngineData, act: EngineActions): 
     $("tbody").innerHTML = r.slice(0, S.limit).map((t) => {
       const g = groupOf(t);
       return `<tr class="tx"><td class="date">${dlabel(t.d)}</td>
-      <td><span class="mn">${esc(t.merch)}</span> ${t.p ? '<span class="pill pend">Pending</span>' : ""}${t.src === "rule" ? '<span class="pill rule" title="Categorised by a rule">rule</span>' : ""}${t.src === "user" ? '<span class="pill rule">edited</span>' : ""}<span class="ds">${esc(t.desc)}</span></td>
+      <td><span class="mn">${esc(t.merch)}</span> ${t.p ? '<span class="pill pend">Pending</span>' : ""}${t.src === "rule" ? '<span class="pill rule" title="Categorised by a rule">rule</span>' : ""}${t.src === "user" ? '<span class="pill rule">edited</span>' : ""}${t.src === "auto" ? `<span class="pill rule" title="${esc("Worked out by the app: " + t.why)}">auto</span>` : ""}<span class="ds">${esc(t.desc)}</span></td>
       <td><span class="cdot" style="background:${GCOL[g]}"></span><select class="catsel" data-tx="${t.id}" aria-label="Category for ${esc(t.merch)}">${opts(t.cid)}</select></td>
       <td class="cardtag">${esc(names[t.c])}</td>
       <td class="r amt ${t.spend < 0 ? "pos" : ""}">${t.spend < 0 ? "+" + fm(-t.spend) : fm(t.spend)}</td></tr>`;
@@ -565,7 +565,9 @@ export function mount(root: HTMLElement, data: EngineData, act: EngineActions): 
     try {
       const u = await act.setCategory(t.id, s.value);
       t.cid = u.category_id; t.src = u.category_source;
-      toast(`Moved to ${catName(t.cid)}. Totals and budgets updated.`);
+      const also = new Set(u.also_updated ?? []);
+      for (const o of TX) if (also.has(o.id)) { o.cid = u.category_id; o.src = "auto"; o.why = "Same payee as one you categorised"; }
+      toast(`Moved to ${catName(t.cid)}${also.size ? ` with ${also.size} more from the same payee` : ""}. Totals and budgets updated.`);
     } catch (err) { fail(err); }
     renderAll();
   });

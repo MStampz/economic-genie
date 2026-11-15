@@ -9,7 +9,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core import audit
-from app.core.categories import Categoriser, get_or_create_category, validate_regex, visible_categories
+from app.core.categories import get_or_create_category, validate_regex, visible_categories
+from app.core.categorisation import Categoriser, payee_key
 from app.core.deps import GroupAccess, group_access, owner_access
 from app.core.models import Account, Category, CategoryRule, Membership, Transaction
 from app.core.schemas import (
@@ -20,9 +21,9 @@ from app.core.schemas import (
     CategoryOut,
     RuleIn,
     RuleOut,
-    TransactionOut,
     TransactionPage,
     TransactionPatch,
+    TransactionUpdateOut,
 )
 from app.core.transfers import delete_transactions, pair_transfers, recategorise, refresh, unpair
 from app.db import get_db
@@ -262,7 +263,26 @@ def list_transactions(
     return TransactionPage(items=items, total=total or 0)
 
 
-@router.patch("/transactions/{transaction_id}", response_model=TransactionOut)
+def _apply_to_same_payee(db: Session, group_id: uuid.UUID, t: Transaction, categoriser: Categoriser) -> list[uuid.UUID]:
+    """A hand-picked category is remembered for the payee: the group's other automatic rows from it follow."""
+    key = categoriser.learn(t.description, t.merchant, t.category_id)
+    if len(key) < 3:
+        return []
+    changed = []
+    for o in db.scalars(
+        select(Transaction).where(
+            Transaction.group_id == group_id,
+            Transaction.id != t.id,
+            Transaction.category_source != "user",
+            Transaction.is_internal_transfer.is_(False),
+        )
+    ):
+        if payee_key(o.description, o.merchant) == key and recategorise(o, categoriser):
+            changed.append(o.id)
+    return changed
+
+
+@router.patch("/transactions/{transaction_id}", response_model=TransactionUpdateOut)
 def update_transaction(
     transaction_id: uuid.UUID,
     body: TransactionPatch,
@@ -275,16 +295,21 @@ def update_transaction(
     """
     t = _get(db, Transaction, transaction_id, access, "Transaction")
     sent = body.model_fields_set
+    also: list[uuid.UUID] = []
     categoriser = Categoriser(db, access.group.id)
     if "category_id" in sent:
         if body.category_id is None:
-            t.category_source = "bank"
+            # Forget the hand pick first, so the app doesn't learn it back from this very row.
+            t.category_id, t.category_source, t.category_reason = None, "bank", None
+            db.flush()
+            categoriser = Categoriser(db, access.group.id)
             recategorise(t, categoriser)
         else:
             c = db.get(Category, body.category_id)
             if c is None or c.group_id not in (None, access.group.id):
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown category.")
-            t.category_id, t.category_source = c.id, "user"
+            t.category_id, t.category_source, t.category_reason = c.id, "user", None
+            also = _apply_to_same_payee(db, access.group.id, t, categoriser)
         audit.log(
             db, "transaction.categorised", user_id=access.user.id, group_id=access.group.id, transaction=str(t.id)
         )
@@ -306,7 +331,9 @@ def update_transaction(
         )
     db.commit()
     db.refresh(t)
-    return t
+    out = TransactionUpdateOut.model_validate(t)
+    out.also_updated = also
+    return out
 
 
 @router.delete("/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
