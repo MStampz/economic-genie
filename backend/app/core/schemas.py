@@ -158,9 +158,15 @@ class TransactionOut(Out):
     is_pending: bool
     category_id: uuid.UUID | None
     category_source: str
+    category_reason: str | None = None
     is_internal_transfer: bool
     transfer_user: bool | None
     import_batch_id: uuid.UUID | None
+
+
+class TransactionUpdateOut(TransactionOut):
+    # Other transactions from the same payee that followed a hand-picked category.
+    also_updated: list[uuid.UUID] = []
 
 
 class TransactionPage(BaseModel):

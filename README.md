@@ -50,7 +50,7 @@ or more categories and can have a monthly amount; a category belongs to one post
 prototype's budget. All figures are computed by the API (`app/modules/budgets/overview.py`), not in the browser.
 
 To load the rules from the prototype, open **Rules → Import rules (JSON)** and pick
-[`examples/prototype-rules.json`](examples/prototype-rules.json), then tap **Apply rules**.
+[`examples/prototype-rules.json`](examples/prototype-rules.json), then tap **Re-categorise everything**.
 
 ## How it is built
 
@@ -66,7 +66,10 @@ docker-compose.yml   database + API + web app
 ```
 
 - **Data belongs to a group** (a family). Every API route checks membership; non-members get "not found".
-- **Category precedence:** a category you pick by hand always wins, then your rules, then NAB's own category.
+- **Category precedence** (`backend/app/core/categorisation/`): a category you pick by hand always wins, then
+  your rules, then payees you have categorised by hand before, then the bank's own category (with aliases such as
+  "Flights" → Travel expenses), then built-in keywords and well-known payees ("rent", "Bunnings", "Medibank"), then a
+  fuzzy match against payees already categorised. Automatic picks are marked "auto" and carry a reason.
 - **New banks or open banking (Basiq/Fiskil)** means adding a connector in `app/ingestion/connectors/`.
 - **Prepared for the coach, hidden for now:** transactions carry a value tag (valued / necessity / drift) with its
   source, and there are tables for goals and value profiles (with the chosen coach persona). AI use needs a per-user

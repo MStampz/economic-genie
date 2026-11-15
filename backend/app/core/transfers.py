@@ -16,7 +16,7 @@ from collections import defaultdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.categories import Categoriser
+from app.core.categorisation import Categoriser
 from app.core.models import Account, Transaction
 
 PAIR_WINDOW_DAYS = 3
@@ -36,14 +36,15 @@ def recategorise(t: Transaction, categoriser: Categoriser) -> bool:
     """Recomputes a category that wasn't chosen by hand. Returns True if it changed."""
     if t.category_source == "user":
         return False
-    category_id, source = categoriser.resolve(
+    d = categoriser.decide(
         description=t.description,
         merchant=t.merchant,
         bank_category=t.bank_category,
         is_transfer=t.is_internal_transfer,
+        amount=t.amount,
     )
-    changed = (category_id, source) != (t.category_id, t.category_source)
-    t.category_id, t.category_source = category_id, source
+    changed = (d.category_id, d.source) != (t.category_id, t.category_source)
+    t.category_id, t.category_source, t.category_reason = d.category_id, d.source, d.reason
     return changed
 
 

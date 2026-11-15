@@ -16,7 +16,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core import audit
-from app.core.categories import Categoriser
+from app.core.categorisation import Categoriser
 from app.core.models import Account, ImportBatch, Transaction
 from app.core.transfers import pair_transfers
 from app.ingestion.connectors.base import Connector, ParsedRow
@@ -132,8 +132,12 @@ def import_rows(
             continue
         existing.add(fp)
         is_transfer = connector.is_internal_transfer(r)
-        category_id, source = categoriser.resolve(
-            description=r.description, merchant=r.merchant, bank_category=r.bank_category, is_transfer=is_transfer
+        decision = categoriser.decide(
+            description=r.description,
+            merchant=r.merchant,
+            bank_category=r.bank_category,
+            is_transfer=is_transfer,
+            amount=r.amount,
         )
         t = Transaction(
             group_id=group_id,
@@ -148,8 +152,9 @@ def import_rows(
             bank_category=r.bank_category,
             balance_after=r.balance_after,
             is_pending=r.is_pending,
-            category_id=category_id,
-            category_source=source,
+            category_id=decision.category_id,
+            category_source=decision.source,
+            category_reason=decision.reason,
             is_internal_transfer=is_transfer,
             source_transfer=is_transfer,
             fingerprint=fp,

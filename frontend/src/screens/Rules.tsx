@@ -26,7 +26,7 @@ export default function Rules({ gid, embedded }: { gid: string; embedded?: boole
     const text = await file.text();
     act(async () => {
       const r = await api.importRules(gid, JSON.parse(text));
-      setMsg(`Added ${r.updated} rules. Tap "Apply rules" to use them on existing transactions.`);
+      setMsg(`Added ${r.updated} rules. Tap "Re-categorise everything" to use them on existing transactions.`);
     });
   }
 
@@ -35,7 +35,9 @@ export default function Rules({ gid, embedded }: { gid: string; embedded?: boole
     <section>
       {!embedded && <h1>Category rules</h1>}
       <p className="muted">A rule puts every transaction whose merchant or description contains the text into a category.
-        Categories you pick by hand are never changed by rules.</p>
+        Categories you pick by hand are never changed by rules. Without a rule, the app also reads the text itself
+        (e.g. "rent", "Bunnings", "Medibank"), remembers payees you have categorised by hand, and matches payees that
+        look like ones it already knows.</p>
       <form className="card form" onSubmit={(e) => { e.preventDefault(); act(async () => { await api.createRule(gid, pattern, categoryId); setPattern(""); }); }}>
         <label>When the text contains<input value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="e.g. bunnings" required minLength={2} /></label>
         <label>Put it in
@@ -51,7 +53,7 @@ export default function Rules({ gid, embedded }: { gid: string; embedded?: boole
         <button>Add category</button>
       </form>
       <div className="row-actions">
-        <button onClick={() => act(async () => { const r = await api.applyRules(gid); setMsg(`Updated ${r.updated} transactions.`); })}>Apply rules</button>
+        <button onClick={() => act(async () => { const r = await api.applyRules(gid); setMsg(`Updated ${r.updated} transactions.`); })}>Re-categorise everything</button>
         <label className="button">Import rules (JSON)<input type="file" accept=".json,application/json" hidden onChange={(e) => importFile(e.target.files?.[0])} /></label>
       </div>
       {msg && <p className="ok">{msg}</p>}

@@ -7,8 +7,8 @@ export type Category = { id: string; name: string; kind: string; group_id: strin
 export type Rule = { id: string; pattern: string; is_regex: boolean; category_id: string; priority: number };
 export type Transaction = {
   id: string; account_id: string; posted_date: string; amount: string; description: string; merchant: string | null;
-  bank_type: string | null; is_pending: boolean; category_id: string | null; category_source: string; is_internal_transfer: boolean;
-  transfer_user: boolean | null; import_batch_id: string | null;
+  bank_type: string | null; is_pending: boolean; category_id: string | null; category_source: string; category_reason?: string | null;
+  is_internal_transfer: boolean; transfer_user: boolean | null; import_batch_id: string | null;
 };
 export type ImportResult = {
   batch_id: string; rows_total: number; rows_new: number; rows_duplicate: number; rows_pending_replaced: number; accounts_created: string[];
@@ -143,7 +143,7 @@ export const api = {
     return call<{ items: Transaction[]; total: number }>("GET", `${g(gid)}/transactions?${qs}`);
   },
   setCategory: (gid: string, id: string, category_id: string | null) =>
-    call<Transaction>("PATCH", `${g(gid)}/transactions/${id}`, { category_id }),
+    call<Transaction & { also_updated: string[] }>("PATCH", `${g(gid)}/transactions/${id}`, { category_id }),
   previewFile: (gid: string, file: File, mapping?: CsvMapping, hasHeader?: boolean) => {
     const fd = form(file, mapping);
     if (hasHeader !== undefined) fd.append("has_header", String(hasHeader));
