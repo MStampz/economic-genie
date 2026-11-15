@@ -26,7 +26,9 @@ const GROUP_DEF: [string, string[]][] = [
   ["Food & drink", ["Groceries", "Restaurants & takeaway", "Cafe & coffee", "Alcohol"]],
   ["Shopping", ["Other shopping", "Clothing & accessories", "Electronics & technology", "Gifts", "Media"]],
   ["Health & beauty", ["Medical", "Personal care"]],
-  ["Transport", ["Crosser", "Fuel", "Vehicle expenses", "Parking & tolls", "Travel expenses", "Taxis & ride shares"]],
+  ["Transport", ["Vehicle expenses", "Parking & tolls", "Taxis & ride shares"]],
+  ["Travel", ["Travel expenses", "Flights", "Accommodation"]],
+  ["Motocross", ["Crosser", "Fuel"]], // fuel goes to the bikes, as in the budget post "Crosser"
   ["Home", ["Homeware", "Home improvements"]],
   ["Bills & services", ["Phone & internet", "Insurance", "Services", "Subscriptions", "Government"]],
   ["Kids & school", ["Education"]],
@@ -39,10 +41,13 @@ const GROUP_DEF: [string, string[]][] = [
 ];
 export const GROUP_NAMES = GROUP_DEF.map((g) => g[0]);
 const GCOL: Record<string, string> = {};
-GROUP_NAMES.forEach((g, i) => (GCOL[g] = "var(--c" + (i + 1) + ")"));
-GCOL["Housing"] = "var(--c12)";
-GCOL["Other"] = "var(--c10)";
-GCOL["Uncategorised"] = "var(--c11)";
+// Fixed colours, so a group keeps its colour when groups are added.
+const GCOL_N: Record<string, number> = {
+  "Food & drink": 1, Shopping: 2, "Health & beauty": 3, Transport: 4, Travel: 13, Motocross: 14, Home: 5,
+  "Bills & services": 6, "Kids & school": 7, "Fun & events": 8, Pets: 9, "Cash & fees": 10, Housing: 12,
+  Other: 10, Uncategorised: 11,
+};
+GROUP_NAMES.forEach((g, i) => (GCOL[g] = "var(--c" + (GCOL_N[g] ?? (i % 12) + 1) + ")"));
 const NAME2G: Record<string, string> = {};
 for (const [g, cs] of GROUP_DEF) for (const c of cs) NAME2G[c.toLowerCase()] = g;
 export const groupOfName = (name: string) => NAME2G[(name || "").toLowerCase()] || "Other";
@@ -99,7 +104,7 @@ const MARKUP = `
       <details class="unl" id="unlinked"><summary>+ Link a budget to another category</summary><div id="linkList" style="margin-top:6px"></div></details>
     </div>
     <div class="card span-3">
-      <div class="card-head"><div><h2>Spending calendar</h2><div class="sub">Darker means more spent. Click a day.</div></div></div>
+      <div class="card-head"><div><h2>Spending calendar</h2><div class="sub" id="calSub">Darker means more spent. Click a day.</div></div></div>
       <div class="cal" id="cal"></div>
     </div>
     <div class="card span-3">
@@ -450,22 +455,30 @@ export function mount(root: HTMLElement, data: EngineData, act: EngineActions): 
   });
 
   // ---------- calendar
+  const CAL_WEEKS = 11;
   function renderCal(rows) {
+    // The latest CAL_WEEKS weeks of the period, newest week on top.
     const p = PERIODS[S.period];
-    const start = d3.timeMonday.floor(pd(p.from)), end = pd(p.to);
+    const last = pd(p.to < p.dataTo ? p.to : p.dataTo);
+    const first = d3.timeMonday.floor(pd(p.from));
+    const top = d3.timeMonday.floor(last);
+    const weeks = [];
+    for (let w = top; w >= first && weeks.length < CAL_WEEKS; w = d3.timeDay.offset(w, -7)) weeks.push(w);
     const byDay = d3.rollup(rows, (v) => d3.sum(v, (t) => t.spend), (t) => t.d);
-    const max = d3.max([...byDay.values()]) || 1;
+    const shown = (k) => k >= p.dataFrom && k <= p.dataTo && k >= p.from && k <= p.to;
+    const keys = weeks.flatMap((w) => d3.range(7).map((i) => iso(d3.timeDay.offset(w, i)))).filter(shown);
+    const max = d3.max(keys, (k) => byDay.get(k) || 0) || 1;
     let html = "<span></span>" + ["M", "T", "W", "T", "F", "S", "S"].map((d) => `<span class="dow">${d}</span>`).join("");
-    for (let w = start; w <= end; w = d3.timeDay.offset(w, 7)) {
+    for (const w of weeks) {
       html += `<span class="wk">${w.getDate()} ${MON[w.getMonth()]}</span>`;
       for (let i = 0; i < 7; i++) {
         const d = d3.timeDay.offset(w, i), k = iso(d);
-        const inData = k >= p.dataFrom && k <= p.dataTo && k >= p.from && k <= p.to;
-        if (!inData) { html += `<span class="day empty" aria-hidden="true"></span>`; continue; }
+        if (!shown(k)) { html += `<span class="day empty" aria-hidden="true"></span>`; continue; }
         const v = Math.max(0, byDay.get(k) || 0), pct = Math.round(Math.sqrt(v / max) * 92) + 4;
         html += `<button class="day ${S.f.day === k ? "on" : ""}" type="button" data-day="${k}" title="${dlabel(k)}: ${fm(v)}" style="background:color-mix(in srgb, var(--accent) ${v ? pct : 0}%, var(--line-soft));color:${v && pct > 55 ? "var(--accent-ink)" : "var(--fg-3)"}">${d.getDate()}</button>`;
       }
     }
+    $("calSub").textContent = `Last ${weeks.length} week${weeks.length === 1 ? "" : "s"}, newest first. Darker means more spent. Click a day.`;
     $("cal").innerHTML = html;
   }
   on("click", (e) => { const d = e.target.closest(".day[data-day]"); if (d) setFilter("day", S.f.day === d.dataset.day ? null : d.dataset.day); });

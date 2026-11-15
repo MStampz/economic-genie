@@ -3,7 +3,7 @@
   --fg:#e8edf7; --fg-2:#9aa6bf; --fg-3:#6b7896;
   --accent:#5fe0c0; --accent-ink:#06261f; --accent-soft:rgba(95,224,192,.14);
   --over:#ff6b6b; --over-soft:rgba(255,107,107,.14); --risk:#ffbe5c; --risk-soft:rgba(255,190,92,.15); --good:#5fe0c0;
-  --c1:#5fe0c0; --c2:#7c9cff; --c3:#ff8fb1; --c4:#ffbe5c; --c5:#b48cff; --c6:#4fc3f7; --c7:#f78f5f; --c8:#9be07a; --c9:#d4a5ff; --c10:#8892aa; --c11:#5d6884; --c12:#e6c79c;
+  --c1:#5fe0c0; --c2:#7c9cff; --c3:#ff8fb1; --c4:#ffbe5c; --c5:#b48cff; --c6:#4fc3f7; --c7:#f78f5f; --c8:#9be07a; --c9:#d4a5ff; --c10:#8892aa; --c11:#5d6884; --c12:#e6c79c; --c13:#ff6f61; --c14:#e8e36b;
   --shadow:0 1px 0 rgba(255,255,255,.03) inset, 0 20px 40px -24px rgba(0,0,0,.6);
   --f-display:'Bricolage Grotesque', 'Avenir Next', system-ui, sans-serif;
   --f-body:'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -14,7 +14,7 @@
   --fg:#111a2e; --fg-2:#4f5b75; --fg-3:#7d88a1;
   --accent:#0f9f84; --accent-ink:#ffffff; --accent-soft:rgba(15,159,132,.10);
   --over:#e0404a; --over-soft:rgba(224,64,74,.10); --risk:#c77d06; --risk-soft:rgba(199,125,6,.12); --good:#0f9f84;
-  --c1:#13a888; --c2:#4a6cf0; --c3:#e0507f; --c4:#d99611; --c5:#8656e6; --c6:#1497cf; --c7:#e06a2e; --c8:#5ea83a; --c9:#b06ad9; --c10:#7a849c; --c11:#a3abbd; --c12:#a8763e;
+  --c1:#13a888; --c2:#4a6cf0; --c3:#e0507f; --c4:#d99611; --c5:#8656e6; --c6:#1497cf; --c7:#e06a2e; --c8:#5ea83a; --c9:#b06ad9; --c10:#7a849c; --c11:#a3abbd; --c12:#a8763e; --c13:#cc3b33; --c14:#8f8a12;
   --shadow:0 1px 2px rgba(17,26,46,.05), 0 12px 32px -20px rgba(17,26,46,.25);
   color-scheme:light;
 }}
